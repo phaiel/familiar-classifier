@@ -95,14 +95,16 @@ def load_existing_patterns():
     patterns = []
     
     if patterns_dir.exists():
-        for yaml_file in patterns_dir.rglob("*.yaml"):
+        yaml_files = list(patterns_dir.rglob("*.yaml"))
+        
+        for yaml_file in yaml_files:
             try:
                 with open(yaml_file, 'r') as f:
                     data = yaml.safe_load(f)
                     if data:
                         patterns.append(data)
             except Exception as e:
-                st.error(f"Error loading {yaml_file}: {e}")
+                st.error(f"Error loading {yaml_file.name}: {e}")
     else:
         st.warning(f"Patterns directory not found: {patterns_dir}")
         st.info(f"Current working directory: {os.getcwd()}")
@@ -134,13 +136,15 @@ def call_hot_path_api(endpoint: str, data: Dict[str, Any] = None) -> Optional[Di
     """Call the Rust hot path API."""
     try:
         url = f"http://localhost:3000{endpoint}"
+        # st.write(f"🔗 Calling API: {url}")  # Debug info - commented out to reduce noise
         if data:
             response = requests.post(url, json=data, timeout=10)
         else:
             response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            return result
         else:
             st.error(f"API Error {response.status_code}: {response.text}")
             return None
@@ -262,7 +266,8 @@ def render_pattern_creation_page():
         existing_patterns = load_existing_patterns()
         
         if existing_patterns:
-            for pattern in existing_patterns[:5]:  # Show first 5
+            st.info(f"Found {len(existing_patterns)} patterns")
+            for pattern in existing_patterns:  # Show all patterns, not just first 5
                 with st.expander(f"📄 {pattern.get('id', 'Unknown')}"):
                     st.json(pattern)
         else:
@@ -284,25 +289,30 @@ def render_chat_interface():
         
         with col_send:
             if st.button("🚀 Classify", type="primary") and user_input:
-                # Call classification API (using camelCase to match Rust schema)
-                classification_data = {
-                    "weaveUnit": {
-                        "text": user_input,
-                        "metadata": {}
-                    },
-                    "maxAlternatives": 3,
-                    "confidenceThreshold": 0.5
-                }
-                
-                result = call_hot_path_api("/classify", classification_data)
-                
-                if result:
-                    # Add to chat history
-                    st.session_state.chat_history.append({
-                        "input": user_input,
-                        "result": result,
-                        "timestamp": "now"
-                    })
+                with st.spinner("🔍 Classifying..."):
+                    # Call classification API (using camelCase to match Rust schema)
+                    classification_data = {
+                        "weaveUnit": {
+                            "text": user_input,
+                            "metadata": {}
+                        },
+                        "maxAlternatives": 3,
+                        "confidenceThreshold": 0.5
+                    }
+                    
+                    result = call_hot_path_api("/classify", classification_data)
+                    
+                    if result:
+                        # Add to chat history
+                        st.session_state.chat_history.append({
+                            "input": user_input,
+                            "result": result,
+                            "timestamp": "now"
+                        })
+                        st.success("✅ Classification completed!")
+                        st.rerun()  # Force UI refresh
+                    else:
+                        st.error("❌ Classification failed - check if hot path service is running")
         
         with col_clear:
             if st.button("🗑️ Clear Chat"):
@@ -427,6 +437,28 @@ def main():
     st.sidebar.markdown("### 🛠️ System Commands")
     st.sidebar.code("cd hot_path && cargo run")
     st.sidebar.code("python -m cold_path.cli temporal-analysis")
+    
+    # Debug panel
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🐛 Debug Panel")
+    if st.sidebar.button("🔧 Test API Connection"):
+        with st.sidebar:
+            st.write("Testing hot path API...")
+            health = call_hot_path_api("/health")
+            if health:
+                st.success("✅ API connection working!")
+                status = call_hot_path_api("/status")
+                if status:
+                    st.json(status.get("vector_store_stats", {}))
+            else:
+                st.error("❌ API connection failed!")
+    
+    if st.sidebar.button("📊 Check Patterns"):
+        with st.sidebar:
+            patterns = load_existing_patterns()
+            st.write(f"Found {len(patterns)} patterns:")
+            for p in patterns:
+                st.write(f"- {p.get('id', 'Unknown')}")
 
 if __name__ == "__main__":
     main() 
