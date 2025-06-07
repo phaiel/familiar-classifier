@@ -59,13 +59,8 @@ class PatternLoader:
             # Validate and create pattern schema
             pattern = PatternSchema(**data)
             
-            # Extract domain and category from ID if not set
-            if not pattern.domain or not pattern.category:
-                parts = pattern.id.split('/')
-                if len(parts) >= 1:
-                    pattern.domain = parts[0]
-                if len(parts) >= 2:
-                    pattern.category = parts[1]
+            # The schema automatically extracts hierarchy levels in __post_init__
+            # No manual extraction needed - the PatternSchema handles this
             
             logger.debug(f"Loaded pattern: {pattern.id}")
             return pattern

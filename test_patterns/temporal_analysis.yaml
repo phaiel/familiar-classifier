@@ -1,0 +1,14 @@
+id: "child_development/sleep/nap/crib/early_am/single_entry"
+description: "Early morning crib nap - single entry pattern with specific temporal context"
+mixins: ["time", "location", "development"]
+sample_texts:
+  - "She went down for her early morning nap at 7:30am without fuss"
+  - "Early AM crib nap successful - 7am to 8:30am"
+  - "First nap of the day went smoothly, down at 7:15am"
+  - "Morning nap in crib was peaceful, 7:45am start"
+  - "Early morning sleep transition worked well"
+metadata:
+  temporal_specificity: "early_am"
+  location_specificity: "crib"
+  duration_typical: "60-90 minutes"
+  success_patterns: ["smooth_transition", "self_settling"] 

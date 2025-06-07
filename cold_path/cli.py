@@ -222,5 +222,148 @@ def index_build(
     asyncio.run(run_build())
 
 
+@app.command()
+def temporal_analysis(
+    patterns_dir: str = typer.Option("cold_path/patterns", "--patterns-dir", help="Directory containing pattern YAML files"),
+    test_patterns_dir: str = typer.Option("test_patterns", "--test-patterns-dir", help="Directory containing test patterns")
+):
+    """Analyze temporal patterns and provide hierarchy recommendations."""
+    try:
+        print("🕒 Temporal Pattern Analysis")
+        print("=" * 50)
+        
+        # Load all patterns
+        all_patterns = []
+        for dir_path in [patterns_dir, test_patterns_dir]:
+            if Path(dir_path).exists():
+                try:
+                    loader = PatternLoader(dir_path)
+                    patterns = loader.load_all_patterns()
+                    all_patterns.extend(patterns)
+                    print(f"📁 Loaded {len(patterns)} patterns from {dir_path}")
+                except Exception as e:
+                    print(f"⚠️  Could not load patterns from {dir_path}: {e}")
+        
+        if not all_patterns:
+            print("❌ No patterns found to analyze")
+            return
+        
+        # Analyze temporal markers
+        temporal_patterns = []
+        non_temporal_patterns = []
+        
+        temporal_markers = ['early_am', 'morning', 'midday', 'afternoon', 'evening', 'night', 'late_night']
+        
+        for pattern in all_patterns:
+            has_temporal = any(marker in pattern.id.lower() for marker in temporal_markers)
+            if has_temporal:
+                temporal_patterns.append(pattern)
+            else:
+                non_temporal_patterns.append(pattern)
+        
+        # Analysis Results
+        print(f"\n📊 Analysis Results:")
+        print(f"   Total Patterns: {len(all_patterns)}")
+        print(f"   With Temporal Markers: {len(temporal_patterns)} ({len(temporal_patterns)/len(all_patterns)*100:.1f}%)")
+        print(f"   Without Temporal Markers: {len(non_temporal_patterns)} ({len(non_temporal_patterns)/len(all_patterns)*100:.1f}%)")
+        
+        # Show temporal conflicts
+        if len(temporal_patterns) >= 2:
+            print(f"\n🔍 Temporal Conflict Analysis:")
+            
+            # Group by base pattern (without temporal marker)
+            base_patterns = {}
+            for pattern in temporal_patterns:
+                parts = pattern.id.split('/')
+                if len(parts) >= 5:  # Has focus level
+                    base_id = '/'.join(parts[:-2])  # Remove focus and form
+                    if base_id not in base_patterns:
+                        base_patterns[base_id] = []
+                    base_patterns[base_id].append(pattern)
+            
+            conflicts_found = False
+            for base_id, patterns in base_patterns.items():
+                if len(patterns) > 1:
+                    conflicts_found = True
+                    temporal_variants = []
+                    for p in patterns:
+                        parts = p.id.split('/')
+                        if len(parts) >= 5:
+                            temporal_variants.append(parts[-2])  # Focus level
+                    print(f"   📋 {base_id}")
+                    print(f"      Temporal variants: {', '.join(temporal_variants)}")
+                    print(f"      ⚠️  Without temporal markers, these would collide!")
+            
+            if not conflicts_found:
+                print("   ✅ No temporal conflicts detected")
+        
+        # Hierarchy depth analysis
+        print(f"\n📏 Hierarchy Depth Analysis:")
+        
+        depth_counts = {}
+        depth_examples = {}
+        
+        for pattern in all_patterns:
+            parts = pattern.id.split('/')
+            depth = len(parts)
+            if depth not in depth_counts:
+                depth_counts[depth] = 0
+                depth_examples[depth] = []
+            depth_counts[depth] += 1
+            if len(depth_examples[depth]) < 2:
+                depth_examples[depth].append(pattern.id)
+        
+        for depth in sorted(depth_counts.keys()):
+            examples = ", ".join(depth_examples[depth])
+            if len(depth_examples[depth]) > 1:
+                examples += f" (and {depth_counts[depth] - len(depth_examples[depth])} more)"
+            print(f"   Depth {depth}: {depth_counts[depth]} patterns - {examples}")
+        
+        # Show 6-level hierarchy mapping
+        print(f"\n🏗️  6-Level Hierarchy Mapping:")
+        levels = ['Domain', 'Area', 'Topic', 'Theme', 'Focus', 'Form']
+        descriptions = [
+            'Highest-level conceptual group',
+            'Life zone or interaction type', 
+            'Functional grouping',
+            'Conceptual behavior cluster',
+            'Leaf-like structural subdivision',
+            'Final pattern node'
+        ]
+        
+        for i, (level, desc) in enumerate(zip(levels, descriptions), 1):
+            print(f"   {i}. {level:<8} - {desc}")
+        
+        # Recommendations
+        print(f"\n💡 Recommendations:")
+        
+        if len(temporal_patterns) / len(all_patterns) < 0.7:
+            print("   🚨 Consider adding temporal markers to more patterns")
+            print("      Temporal context prevents classification ambiguity")
+        
+        print("   ✅ Include temporal markers when:")
+        print("      - Same activity occurs at different times with different characteristics")
+        print("      - Time of day affects behavior/success patterns") 
+        print("      - Context matters for intervention strategies")
+        
+        print("   ⚖️  Omit temporal markers when:")
+        print("      - Pattern is time-agnostic")
+        print("      - Temporal variation is not behaviorally significant")
+        
+        # Final recommendation
+        optimal_depth = 5 if len(temporal_patterns) > 0 else 4
+        print(f"\n🎯 Optimal depth for this dataset: {optimal_depth} levels")
+        print(f"   Includes temporal markers: {'Yes' if optimal_depth == 5 else 'No'}")
+        
+        # Show sample 6-level pattern
+        print(f"\n📝 Sample 6-Level Pattern Structure:")
+        print("   self_state/emotional_regulation/overwhelm/sensory_overload/evening/shutdown_response")
+        print("   ↳ Domain/Area/Topic/Theme/Focus/Form")
+        
+    except Exception as e:
+        print(f"❌ Error in temporal analysis: {e}")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app() 

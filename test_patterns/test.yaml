@@ -1,0 +1,7 @@
+id: "completely/different/path/structure"
+description: "Test pattern with non-matching path"
+sample_texts:
+  - "This is a test pattern"
+  - "The ID doesn't match the file path"
+mixins: []
+metadata: {} 

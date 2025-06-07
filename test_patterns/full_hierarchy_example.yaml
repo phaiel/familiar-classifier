@@ -1,0 +1,19 @@
+id: "self_state/emotional_regulation/overwhelm/sensory_overload/evening/shutdown_response"
+description: "Evening sensory overload leading to complete shutdown - requires immediate intervention"
+mixins: ["emotion", "time", "person"]
+sample_texts:
+  - "I can't handle any more noise, I need complete silence now"
+  - "Everything is too much right now, I'm shutting down"
+  - "The lights are too bright, sounds too loud, I need to retreat"
+  - "Sensory overload hitting hard, going into shutdown mode"
+  - "Can't process anything more, need immediate quiet space"
+metadata:
+  domain_notes: "self_state - internal psychological/physiological states"
+  area_notes: "emotional_regulation - managing emotional responses"
+  topic_notes: "overwhelm - state of being overwhelmed by stimuli"
+  theme_notes: "sensory_overload - specific type of overwhelm from sensory input"
+  focus_notes: "evening - temporal context when this pattern typically occurs"
+  form_notes: "shutdown_response - specific behavioral manifestation"
+  intervention_required: true
+  urgency_level: "high"
+  typical_triggers: ["noise", "bright_lights", "multiple_stimuli", "fatigue"] 
