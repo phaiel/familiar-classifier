@@ -133,8 +133,8 @@ cleanup() {
 trap cleanup INT TERM
 
 # Start UI (this will run in foreground)
-cd ui
-$PYTHON_CMD run_ui.py
+print_status "Starting UI from project root directory..."
+$PYTHON_CMD ui/run_ui.py
 
 # This line should never be reached, but just in case
 cleanup 

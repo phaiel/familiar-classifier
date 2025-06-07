@@ -50,9 +50,15 @@ def main():
     # Check hot path service (optional)
     check_hot_path_service()
     
-    # Change to UI directory
+    # Ensure we're in the project root directory
+    project_root = Path(__file__).parent.parent
+    os.chdir(project_root)
+    
+    print(f"Working directory: {os.getcwd()}")
+    print(f"UI directory: {Path(__file__).parent}")
+    
+    # Set UI directory for Streamlit
     ui_dir = Path(__file__).parent
-    os.chdir(ui_dir)
     
     print("\n🚀 Starting Streamlit UI...")
     print("📍 UI will be available at: http://localhost:8501")
@@ -62,7 +68,7 @@ def main():
     # Launch Streamlit
     try:
         subprocess.run([
-            sys.executable, "-m", "streamlit", "run", "app.py",
+            sys.executable, "-m", "streamlit", "run", str(ui_dir / "app.py"),
             "--server.port", "8501",
             "--server.address", "localhost",
             "--browser.gatherUsageStats", "false"

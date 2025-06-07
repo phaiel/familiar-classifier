@@ -13,9 +13,17 @@ import sys
 import os
 
 # Add the parent directory to Python path so we can import from cold_path
-sys.path.append(str(Path(__file__).parent.parent))
+parent_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(parent_dir))
 
-from cold_path.schemas import PatternSchema, PatternMixin, WeaveUnit, ClassificationRequest
+try:
+    from cold_path.schemas import PatternSchema, PatternMixin, WeaveUnit, ClassificationRequest
+except ImportError as e:
+    st.error(f"Failed to import cold_path modules: {e}")
+    st.error(f"Current working directory: {os.getcwd()}")
+    st.error(f"Python path: {sys.path}")
+    st.error(f"Parent directory: {parent_dir}")
+    st.stop()
 
 # Page configuration
 st.set_page_config(
