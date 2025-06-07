@@ -5,9 +5,13 @@ from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 import json
 import requests
-from loguru import logger
+import logging
 
 from .schemas import PatternSchema
+
+# Setup simple logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 class VectorStore(ABC):
@@ -135,7 +139,10 @@ class QdrantVectorStore(VectorStore):
     
     async def create_collection(self, collection_name: str, vector_size: int, overwrite: bool = False) -> None:
         """Create Qdrant collection."""
-        from qdrant_client.http.models import Distance, VectorParams
+        try:
+            from qdrant_client.http.models import Distance, VectorParams
+        except ImportError:
+            raise ImportError("qdrant-client not installed. Install with: pip install qdrant-client")
         
         # Check if collection exists
         collections = self.client.get_collections()
@@ -156,7 +163,10 @@ class QdrantVectorStore(VectorStore):
     
     async def upload_patterns(self, patterns: List[PatternSchema], embeddings: Dict[str, np.ndarray]) -> Dict[str, Any]:
         """Upload patterns to Qdrant."""
-        from qdrant_client.http.models import PointStruct
+        try:
+            from qdrant_client.http.models import PointStruct
+        except ImportError:
+            raise ImportError("qdrant-client not installed. Install with: pip install qdrant-client")
         
         points = []
         for pattern in patterns:

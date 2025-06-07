@@ -4,9 +4,13 @@ import os
 import yaml
 from pathlib import Path
 from typing import List, Dict, Any
-from loguru import logger
+import logging
 
 from .schemas import PatternSchema
+
+# Setup simple logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 class PatternLoader:

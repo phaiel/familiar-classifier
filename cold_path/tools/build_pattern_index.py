@@ -6,7 +6,11 @@ import numpy as np
 from rich.console import Console
 from rich.progress import Progress, TaskID
 from sentence_transformers import SentenceTransformer
-from loguru import logger
+import logging
+
+# Setup simple logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 from ..pattern_loader import PatternLoader
 from ..schemas import PatternSchema, IndexBuildConfig

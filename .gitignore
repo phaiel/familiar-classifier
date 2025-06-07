@@ -106,17 +106,21 @@ checkpoints/
 *.pkl
 *.pickle
 *.csv
-*.json
 data/
 datasets/
+# Exclude JSON data files but allow generated assets
+!assets/schemas.json
+!assets/patterns_with_embeddings.json
+!assets/patterns.json
 
 # Qdrant data
 qdrant_storage/
 
 # Generated files
-# Generated assets (keep patterns_with_embeddings.json but ignore temp files)
+# Generated assets (include important files, exclude temp files)
 assets/*.tmp
 assets/*.log
+assets/temp/
 outputs/
 
 # Byte-compiled / optimized / DLL files
