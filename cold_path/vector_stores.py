@@ -141,67 +141,77 @@ class QdrantVectorStore(VectorStore):
         """Create Qdrant collection."""
         try:
             from qdrant_client.http.models import Distance, VectorParams
+            
+            # Check if collection exists
+            collections = self.client.get_collections()
+            collection_exists = any(c.name == collection_name for c in collections.collections)
+            
+            if collection_exists and overwrite:
+                logger.info(f"🗑️  Deleting existing collection: {collection_name}")
+                self.client.delete_collection(collection_name)
+            elif collection_exists and not overwrite:
+                logger.info(f"📊 Collection '{collection_name}' already exists")
+                return
+            
+            logger.info(f"🏗️  Creating collection: {collection_name}")
+            self.client.create_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
         except ImportError:
             raise ImportError("qdrant-client not installed. Install with: pip install qdrant-client")
-        
-        # Check if collection exists
-        collections = self.client.get_collections()
-        collection_exists = any(c.name == collection_name for c in collections.collections)
-        
-        if collection_exists and overwrite:
-            logger.info(f"🗑️  Deleting existing collection: {collection_name}")
-            self.client.delete_collection(collection_name)
-        elif collection_exists and not overwrite:
-            logger.info(f"📊 Collection '{collection_name}' already exists")
-            return
-        
-        logger.info(f"🏗️  Creating collection: {collection_name}")
-        self.client.create_collection(
-            collection_name=collection_name,
-            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-        )
+        except Exception as e:
+            logger.error(f"Failed to create Qdrant collection: {e}")
+            raise
     
     async def upload_patterns(self, patterns: List[PatternSchema], embeddings: Dict[str, np.ndarray]) -> Dict[str, Any]:
         """Upload patterns to Qdrant."""
         try:
             from qdrant_client.http.models import PointStruct
+            
+            points = []
+            for pattern in patterns:
+                if pattern.id in embeddings:
+                    point = PointStruct(
+                        id=len(points),
+                        vector=embeddings[pattern.id].tolist(),
+                        payload={
+                            "pattern_id": pattern.id,
+                            "description": pattern.description,
+                            "domain": pattern.domain,
+                            "sample_texts": pattern.sample_texts,
+                            "metadata": pattern.metadata,
+                        },
+                    )
+                    points.append(point)
+            
+            # Upload in batches
+            batch_size = 100
+            for i in range(0, len(points), batch_size):
+                batch = points[i:i + batch_size]
+                self.client.upsert(collection_name="patterns", points=batch)
+            
+            return {
+                "status": "success",
+                "patterns_uploaded": len(points),
+                "message": f"Uploaded to Qdrant at {self.host}:{self.port}"
+            }
         except ImportError:
             raise ImportError("qdrant-client not installed. Install with: pip install qdrant-client")
-        
-        points = []
-        for pattern in patterns:
-            if pattern.id in embeddings:
-                point = PointStruct(
-                    id=len(points),
-                    vector=embeddings[pattern.id].tolist(),
-                    payload={
-                        "pattern_id": pattern.id,
-                        "description": pattern.description,
-                        "domain": pattern.domain,
-                        "sample_texts": pattern.sample_texts,
-                        "metadata": pattern.metadata,
-                    },
-                )
-                points.append(point)
-        
-        # Upload in batches
-        batch_size = 100
-        for i in range(0, len(points), batch_size):
-            batch = points[i:i + batch_size]
-            self.client.upsert(collection_name="patterns", points=batch)
-        
-        return {
-            "status": "success",
-            "patterns_uploaded": len(points),
-            "message": f"Uploaded to Qdrant at {self.host}:{self.port}"
-        }
+        except Exception as e:
+            logger.error(f"Failed to upload patterns to Qdrant: {e}")
+            raise
     
     async def health_check(self) -> bool:
         """Check Qdrant health."""
         try:
             collections = self.client.get_collections()
             return True
-        except Exception:
+        except ImportError:
+            logger.error("qdrant-client not installed")
+            return False
+        except Exception as e:
+            logger.error(f"Qdrant health check failed: {e}")
             return False
     
     async def get_stats(self) -> Dict[str, Any]:
@@ -214,6 +224,8 @@ class QdrantVectorStore(VectorStore):
                 "port": self.port,
                 "collections": [c.name for c in collections.collections],
             }
+        except ImportError:
+            return {"error": "qdrant-client not installed"}
         except Exception as e:
             return {"error": str(e)}
 

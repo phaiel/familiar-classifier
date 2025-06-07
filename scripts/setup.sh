@@ -23,7 +23,10 @@ fi
 if ! command -v cargo &> /dev/null; then
     echo "❌ Rust not found. Installing Rust..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    source $HOME/.cargo/env
+    if [ -f "$HOME/.cargo/env" ]; then
+        source "$HOME/.cargo/env"
+    fi
+    export PATH="$HOME/.cargo/bin:$PATH"
     echo "✅ Rust installed"
 else
     echo "✅ Rust found"
@@ -92,13 +95,7 @@ if curl -s http://localhost:3000/health &> /dev/null; then
     echo "🎯 Testing classification..."
     RESULT=$(curl -s -X POST http://localhost:3000/classify \
         -H "Content-Type: application/json" \
-        -d '{
-            "weaveUnit": {
-                "id": "123e4567-e89b-12d3-a456-426614174000",
-                "text": "my child is playing at the park this afternoon"
-            },
-            "confidenceThreshold": 0.1
-        }')
+        -d '{"weaveUnit":{"id":"123e4567-e89b-12d3-a456-426614174000","text":"my child is playing at the park this afternoon"},"confidenceThreshold":0.1}')
     
     if echo "$RESULT" | grep -q "success"; then
         echo "✅ Classification test passed"
