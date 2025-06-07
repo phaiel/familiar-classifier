@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "familiar-pattern-classifier"
+version = "0.1.0"
+description = "Schema-driven WeaveUnit → Pattern classification using MiniLM + Qdrant (Cold Path)"
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "cold_path"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+sentence-transformers = "^3.0.0"
+qdrant-client = "^1.9.0"
+pydantic = "^2.7.0"
+pyyaml = "^6.0.1"
+copier = "^9.1.0"
+numpy = "^1.24.0"
+httpx = "^0.27.0"
+typer = "^0.12.0"
+rich = "^13.7.0"
+loguru = "^0.7.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+pytest-asyncio = "^0.23.0"
+black = "^24.4.0"
+ruff = "^0.4.0"
+mypy = "^1.10.0"
+
+[tool.poetry.scripts]
+pattern-classifier = "cold_path.cli:main"
+build-index = "cold_path.tools.build_pattern_index:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true 

@@ -1,0 +1,450 @@
+{
+  "schema_version": "1.0.0",
+  "generated_by": "pattern-classifier-cold-path",
+  "models": {
+    "PatternSchema": {
+      "$defs": {
+        "PatternMixin": {
+          "description": "Available mixins for patterns.",
+          "enum": [
+            "time",
+            "emotion",
+            "thread_link",
+            "location",
+            "person",
+            "activity",
+            "health",
+            "development"
+          ],
+          "title": "PatternMixin",
+          "type": "string"
+        }
+      },
+      "description": "Schema for pattern definitions.",
+      "properties": {
+        "id": {
+          "description": "Hierarchical pattern ID (e.g., 'child_development/sleep/nap/crib/early_am')",
+          "title": "Id",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description for embedding",
+          "title": "Description",
+          "type": "string"
+        },
+        "mixins": {
+          "description": "Schema composition mixins",
+          "items": {
+            "$ref": "#/$defs/PatternMixin"
+          },
+          "title": "Mixins",
+          "type": "array"
+        },
+        "sample_texts": {
+          "description": "Example texts for training embeddings",
+          "items": {
+            "type": "string"
+          },
+          "title": "Sample Texts",
+          "type": "array"
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Top-level domain (extracted from id)",
+          "title": "Domain"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Category (extracted from id)",
+          "title": "Category"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "sample_texts"
+      ],
+      "title": "PatternSchema",
+      "type": "object"
+    },
+    "WeaveUnit": {
+      "description": "Input unit for classification.",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "description": "Text content to be classified",
+          "title": "Text",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO timestamp",
+          "title": "Timestamp"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "WeaveUnit",
+      "type": "object"
+    },
+    "PatternMatch": {
+      "description": "Result of pattern classification.",
+      "properties": {
+        "pattern_id": {
+          "description": "ID of matched pattern",
+          "title": "Pattern Id",
+          "type": "string"
+        },
+        "confidence": {
+          "description": "Confidence score",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "alternatives": {
+          "description": "Alternative matches",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        },
+        "embedding_vector": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Input embedding vector",
+          "title": "Embedding Vector"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "pattern_id",
+        "confidence"
+      ],
+      "title": "PatternMatch",
+      "type": "object"
+    },
+    "ClassificationRequest": {
+      "$defs": {
+        "WeaveUnit": {
+          "description": "Input unit for classification.",
+          "properties": {
+            "id": {
+              "format": "uuid",
+              "title": "Id",
+              "type": "string"
+            },
+            "text": {
+              "description": "Text content to be classified",
+              "title": "Text",
+              "type": "string"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "title": "Metadata",
+              "type": "object"
+            },
+            "timestamp": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "ISO timestamp",
+              "title": "Timestamp"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "WeaveUnit",
+          "type": "object"
+        }
+      },
+      "description": "Request for pattern classification.",
+      "properties": {
+        "weave_unit": {
+          "$ref": "#/$defs/WeaveUnit"
+        },
+        "max_alternatives": {
+          "default": 3,
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Max Alternatives",
+          "type": "integer"
+        },
+        "confidence_threshold": {
+          "default": 0.5,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence Threshold",
+          "type": "number"
+        },
+        "filter_by_domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter results by domain",
+          "title": "Filter By Domain"
+        }
+      },
+      "required": [
+        "weave_unit"
+      ],
+      "title": "ClassificationRequest",
+      "type": "object"
+    },
+    "ClassificationResponse": {
+      "$defs": {
+        "PatternMatch": {
+          "description": "Result of pattern classification.",
+          "properties": {
+            "pattern_id": {
+              "description": "ID of matched pattern",
+              "title": "Pattern Id",
+              "type": "string"
+            },
+            "confidence": {
+              "description": "Confidence score",
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "title": "Confidence",
+              "type": "number"
+            },
+            "alternatives": {
+              "description": "Alternative matches",
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "title": "Alternatives",
+              "type": "array"
+            },
+            "embedding_vector": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Input embedding vector",
+              "title": "Embedding Vector"
+            },
+            "metadata": {
+              "additionalProperties": true,
+              "title": "Metadata",
+              "type": "object"
+            }
+          },
+          "required": [
+            "pattern_id",
+            "confidence"
+          ],
+          "title": "PatternMatch",
+          "type": "object"
+        }
+      },
+      "description": "Response from pattern classification.",
+      "properties": {
+        "request_id": {
+          "format": "uuid",
+          "title": "Request Id",
+          "type": "string"
+        },
+        "match": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PatternMatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Best match if above threshold"
+        },
+        "alternatives": {
+          "items": {
+            "$ref": "#/$defs/PatternMatch"
+          },
+          "title": "Alternatives",
+          "type": "array"
+        },
+        "processing_time_ms": {
+          "description": "Classification time in milliseconds",
+          "title": "Processing Time Ms",
+          "type": "number"
+        },
+        "status": {
+          "default": "success",
+          "title": "Status",
+          "type": "string"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Message"
+        }
+      },
+      "required": [
+        "processing_time_ms"
+      ],
+      "title": "ClassificationResponse",
+      "type": "object"
+    },
+    "IndexBuildConfig": {
+      "description": "Configuration for building pattern index (database agnostic).",
+      "properties": {
+        "model_name": {
+          "default": "all-MiniLM-L6-v2",
+          "description": "Sentence transformer model",
+          "title": "Model Name",
+          "type": "string"
+        },
+        "vector_store_type": {
+          "default": "in_memory",
+          "description": "Vector store backend (in_memory, qdrant, etc)",
+          "title": "Vector Store Type",
+          "type": "string"
+        },
+        "host": {
+          "default": "localhost",
+          "description": "Vector store host (if applicable)",
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "default": 3000,
+          "description": "Vector store port (if applicable)",
+          "title": "Port",
+          "type": "integer"
+        },
+        "collection_name": {
+          "default": "pattern_index",
+          "description": "Collection/index name",
+          "title": "Collection Name",
+          "type": "string"
+        },
+        "vector_size": {
+          "default": 384,
+          "description": "Embedding vector size",
+          "title": "Vector Size",
+          "type": "integer"
+        },
+        "patterns_dir": {
+          "default": "cold_path/patterns",
+          "description": "Directory containing pattern YAML files",
+          "title": "Patterns Dir",
+          "type": "string"
+        },
+        "batch_size": {
+          "default": 100,
+          "description": "Batch size for processing",
+          "title": "Batch Size",
+          "type": "integer"
+        },
+        "overwrite_collection": {
+          "default": false,
+          "description": "Whether to overwrite existing collection",
+          "title": "Overwrite Collection",
+          "type": "boolean"
+        }
+      },
+      "title": "IndexBuildConfig",
+      "type": "object"
+    },
+    "PatternMixin": {
+      "type": "string",
+      "enum": [
+        "time",
+        "emotion",
+        "thread_link",
+        "location",
+        "person",
+        "activity",
+        "health",
+        "development"
+      ],
+      "description": "<enum 'PatternMixin'>"
+    }
+  }
+}

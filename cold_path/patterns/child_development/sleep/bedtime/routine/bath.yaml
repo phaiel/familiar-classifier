@@ -1,0 +1,16 @@
+id: "child_development/sleep/bedtime/routine/bath"
+description: "Bedtime routine involving bath time"
+mixins:
+  - time
+  - activity
+  - thread_link
+sample_texts:
+  - "Bath time before bed, getting ready to sleep."
+  - "Had a nice warm bath as part of bedtime routine."
+  - "Gave him a bath before putting him down for the night."
+  - "Bath and story time before bedtime."
+  - "She loves her evening bath before sleep."
+metadata:
+  age_range: "0-8 years"
+  typical_duration: "15-30 minutes"
+  time_window: "6pm-9pm" 

@@ -1,0 +1,16 @@
+id: "health/meals/lunch/outdoor/picnic"
+description: "Lunch eaten outdoors as a picnic"
+mixins:
+  - location
+  - activity
+  - health
+sample_texts:
+  - "Had a picnic lunch in the park today."
+  - "Ate our sandwiches outside on a blanket."
+  - "Family picnic lunch by the lake."
+  - "Packed lunch for outdoor picnic."
+  - "Beautiful day for a picnic lunch outside."
+metadata:
+  setting: "outdoor"
+  typical_foods: ["sandwiches", "fruit", "snacks"]
+  season: ["spring", "summer", "early_fall"] 

@@ -1,0 +1,53 @@
+[package]
+name = "familiar-pattern-classifier"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Web framework
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Simple in-memory vector store - no external dependencies!
+# qdrant-client = "1.9"  # Optional: can add back for production
+
+# ML/Embeddings (simplified for now - can add Candle later)
+# candle-core = "0.4"  # Has dependency conflicts currently
+# candle-nn = "0.4"
+# candle-transformers = "0.4"
+# tokenizers = "0.15"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json"] }
+
+# Utilities
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+thiserror = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Configuration
+config = "0.14"
+
+# Performance
+rayon = "1.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[build-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0" 

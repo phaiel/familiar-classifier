@@ -1,0 +1,16 @@
+id: "child_development/sleep/nap/crib/early_am"
+description: "Early morning nap taken in crib"
+mixins:
+  - time
+  - emotion
+  - thread_link
+sample_texts:
+  - "Took a short nap in the crib at 7am."
+  - "Finally fell asleep in crib early in the morning."
+  - "Had his morning nap in the crib around 6:30am."
+  - "She settled down for an early morning sleep in her crib."
+  - "Quick crib nap before breakfast this morning."
+metadata:
+  age_range: "0-24 months"
+  typical_duration: "30-90 minutes"
+  time_window: "5am-9am" 

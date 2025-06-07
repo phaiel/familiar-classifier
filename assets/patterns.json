@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0.0",
+  "generated_by": "familiar-pattern-classifier-cold-path",
+  "total_patterns": 4,
+  "patterns": [
+    {
+      "id": "child_development/play/outdoor/park/afternoon",
+      "description": "Afternoon play session at the park",
+      "domain": "child_development",
+      "category": "play",
+      "mixins": [
+        "time",
+        "location",
+        "activity",
+        "development"
+      ],
+      "sample_texts": [
+        "Spent the afternoon playing at the park.",
+        "Had fun on the swings and slides this afternoon.",
+        "Great afternoon of outdoor play at the local park.",
+        "Kids enjoyed the playground equipment this afternoon.",
+        "Beautiful afternoon for park play and fresh air."
+      ],
+      "metadata": {
+        "age_range": "2-12 years",
+        "typical_duration": "60-180 minutes",
+        "time_window": "12pm-6pm",
+        "weather_dependent": true
+      }
+    },
+    {
+      "id": "child_development/sleep/nap/crib/early_am",
+      "description": "Early morning nap taken in crib",
+      "domain": "child_development",
+      "category": "sleep",
+      "mixins": [
+        "time",
+        "emotion",
+        "thread_link"
+      ],
+      "sample_texts": [
+        "Took a short nap in the crib at 7am.",
+        "Finally fell asleep in crib early in the morning.",
+        "Had his morning nap in the crib around 6:30am.",
+        "She settled down for an early morning sleep in her crib.",
+        "Quick crib nap before breakfast this morning."
+      ],
+      "metadata": {
+        "age_range": "0-24 months",
+        "typical_duration": "30-90 minutes",
+        "time_window": "5am-9am"
+      }
+    },
+    {
+      "id": "child_development/sleep/bedtime/routine/bath",
+      "description": "Bedtime routine involving bath time",
+      "domain": "child_development",
+      "category": "sleep",
+      "mixins": [
+        "time",
+        "activity",
+        "thread_link"
+      ],
+      "sample_texts": [
+        "Bath time before bed, getting ready to sleep.",
+        "Had a nice warm bath as part of bedtime routine.",
+        "Gave him a bath before putting him down for the night.",
+        "Bath and story time before bedtime.",
+        "She loves her evening bath before sleep."
+      ],
+      "metadata": {
+        "age_range": "0-8 years",
+        "typical_duration": "15-30 minutes",
+        "time_window": "6pm-9pm"
+      }
+    },
+    {
+      "id": "health/meals/lunch/outdoor/picnic",
+      "description": "Lunch eaten outdoors as a picnic",
+      "domain": "health",
+      "category": "meals",
+      "mixins": [
+        "location",
+        "activity",
+        "health"
+      ],
+      "sample_texts": [
+        "Had a picnic lunch in the park today.",
+        "Ate our sandwiches outside on a blanket.",
+        "Family picnic lunch by the lake.",
+        "Packed lunch for outdoor picnic.",
+        "Beautiful day for a picnic lunch outside."
+      ],
+      "metadata": {
+        "setting": "outdoor",
+        "typical_foods": [
+          "sandwiches",
+          "fruit",
+          "snacks"
+        ],
+        "season": [
+          "spring",
+          "summer",
+          "early_fall"
+        ]
+      }
+    }
+  ],
+  "domains": [
+    "child_development",
+    "health"
+  ]
+}
