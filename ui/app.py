@@ -89,7 +89,9 @@ if 'patterns' not in st.session_state:
 
 def load_existing_patterns():
     """Load existing patterns from the patterns directory."""
-    patterns_dir = Path("../cold_path/patterns")
+    # Get absolute path to patterns directory
+    current_dir = Path(__file__).parent.parent  # Go up to project root
+    patterns_dir = current_dir / "cold_path" / "patterns"
     patterns = []
     
     if patterns_dir.exists():
@@ -101,6 +103,10 @@ def load_existing_patterns():
                         patterns.append(data)
             except Exception as e:
                 st.error(f"Error loading {yaml_file}: {e}")
+    else:
+        st.warning(f"Patterns directory not found: {patterns_dir}")
+        st.info(f"Current working directory: {os.getcwd()}")
+        st.info(f"Looking for patterns in: {patterns_dir.absolute()}")
     
     return patterns
 
@@ -108,8 +114,12 @@ def save_pattern(pattern_data: Dict[str, Any]) -> bool:
     """Save a pattern to the patterns directory."""
     try:
         pattern_id = pattern_data['id']
+        # Get absolute path to patterns directory
+        current_dir = Path(__file__).parent.parent  # Go up to project root
+        patterns_dir = current_dir / "cold_path" / "patterns"
+        
         # Create directory structure from pattern ID
-        pattern_path = Path("../cold_path/patterns") / (pattern_id.replace('/', '/') + '.yaml')
+        pattern_path = patterns_dir / (pattern_id.replace('/', '/') + '.yaml')
         pattern_path.parent.mkdir(parents=True, exist_ok=True)
         
         with open(pattern_path, 'w') as f:
