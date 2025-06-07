@@ -8,7 +8,7 @@ import requests
 import json
 import yaml
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 import sys
 import os
 
@@ -132,19 +132,25 @@ def save_pattern(pattern_data: Dict[str, Any]) -> bool:
         st.error(f"Error saving pattern: {e}")
         return False
 
-def call_hot_path_api(endpoint: str, data: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
+def call_hot_path_api(endpoint: str, data: Dict[str, Any] = None, expect_json: bool = True) -> Optional[Union[Dict[str, Any], str]]:
     """Call the Rust hot path API."""
     try:
         url = f"http://localhost:3000{endpoint}"
-        # st.write(f"🔗 Calling API: {url}")  # Debug info - commented out to reduce noise
+        
         if data:
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, headers={"Content-Type": "application/json"}, timeout=10)
         else:
             response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
-            result = response.json()
-            return result
+            if expect_json:
+                try:
+                    return response.json()
+                except json.JSONDecodeError:
+                    # If we expected JSON but got plain text, return the text
+                    return response.text.strip()
+            else:
+                return response.text.strip()
         else:
             st.error(f"API Error {response.status_code}: {response.text}")
             return None
@@ -247,9 +253,11 @@ def render_pattern_creation_page():
                         st.success(f"✅ Pattern saved: {pattern_id}")
                         # Reload patterns index
                         if st.button("🔄 Reload Hot Path Patterns"):
-                            result = call_hot_path_api("/reload-patterns")
-                            if result:
-                                st.success("🔥 Hot path patterns reloaded!")
+                            result = call_hot_path_api("/reload-patterns", data={})
+                            if result and isinstance(result, dict):
+                                st.success(f"🔥 {result.get('message', 'Hot path patterns reloaded!')}")
+                            else:
+                                st.error("❌ Failed to reload hot path patterns")
                     else:
                         st.error("❌ Failed to save pattern")
                         
@@ -302,7 +310,7 @@ def render_chat_interface():
                     
                     result = call_hot_path_api("/classify", classification_data)
                     
-                    if result:
+                    if result and isinstance(result, dict):
                         # Add to chat history
                         st.session_state.chat_history.append({
                             "input": user_input,
@@ -366,7 +374,7 @@ def render_chat_interface():
         # Check hot path status
         status = call_hot_path_api("/status")
         
-        if status:
+        if status and isinstance(status, dict):
             st.markdown('<div class="classification-result">', unsafe_allow_html=True)
             st.markdown("### ✅ Hot Path Online")
             st.json(status)
@@ -381,14 +389,18 @@ def render_chat_interface():
         st.markdown("### ⚡ Quick Actions")
         
         if st.button("🔄 Reload Patterns"):
-            result = call_hot_path_api("/reload-patterns")
-            if result:
-                st.success("Patterns reloaded!")
+            result = call_hot_path_api("/reload-patterns", data={})
+            if result and isinstance(result, dict):
+                st.success(f"✅ {result.get('message', 'Patterns reloaded!')}")
+            else:
+                st.error("❌ Failed to reload patterns")
         
         if st.button("🏥 Health Check"):
-            result = call_hot_path_api("/health")
-            if result:
-                st.success("System healthy!")
+            result = call_hot_path_api("/health", expect_json=False)
+            if result == "OK":
+                st.success("✅ System healthy!")
+            else:
+                st.error("❌ Health check failed")
         
         # Pattern statistics
         st.markdown("### 📊 Pattern Stats")
@@ -444,11 +456,11 @@ def main():
     if st.sidebar.button("🔧 Test API Connection"):
         with st.sidebar:
             st.write("Testing hot path API...")
-            health = call_hot_path_api("/health")
-            if health:
+            health = call_hot_path_api("/health", expect_json=False)
+            if health == "OK":
                 st.success("✅ API connection working!")
                 status = call_hot_path_api("/status")
-                if status:
+                if status and isinstance(status, dict):
                     st.json(status.get("vector_store_stats", {}))
             else:
                 st.error("❌ API connection failed!")
