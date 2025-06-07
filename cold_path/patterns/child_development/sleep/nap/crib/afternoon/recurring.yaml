@@ -1,0 +1,14 @@
+id: "child_development/sleep/nap/crib/afternoon/recurring"
+description: "Afternoon crib nap - recurring pattern with different temporal challenges"
+mixins: ["time", "location", "development"]
+sample_texts:
+  - "Afternoon nap was difficult today, took 45 minutes to settle"
+  - "She fought the 2pm nap but eventually went down"
+  - "Afternoon sleep resistance is getting worse"
+  - "Had to try three times for the afternoon nap"
+  - "Post-lunch nap was a struggle, finally asleep at 2:30pm"
+metadata:
+  temporal_specificity: "afternoon"
+  location_specificity: "crib"
+  duration_typical: "90-120 minutes"
+  challenge_patterns: ["resistance", "multiple_attempts", "overtiredness"] 

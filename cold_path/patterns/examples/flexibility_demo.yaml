@@ -1,0 +1,10 @@
+id: "completely/different/path/structure"
+description: "Test pattern with non-matching path - demonstrates pattern ID flexibility"
+sample_texts:
+  - "This is a test pattern showing flexible organization"
+  - "The ID doesn't have to match the file path structure"
+  - "Patterns can be organized by topic, not just hierarchy"
+mixins: []
+metadata:
+  demonstration: "Pattern IDs are independent of file organization"
+  flexibility: "High - organize files however makes sense for your project" 
