@@ -1,197 +1,164 @@
-# 🧠 Familiar Classifier UI
+# 🧠 Familiar Classifier - Schema-Driven UI
 
-Modern web interface for creating patterns and testing classification with the Familiar Classifier system.
+A **completely schema-driven** Streamlit interface that automatically generates forms and displays from JSON schemas, ensuring perfect consistency with the hot path API.
 
-## ✨ Features
+## ✨ Key Features
 
-### 🎨 Pattern Creation
-- **6-Level Hierarchy Builder**: Guided creation of Domain/Area/Topic/Theme/Focus/Form patterns
-- **Real-time Validation**: Instant schema validation and preview
-- **Auto-generated IDs**: Automatic pattern ID generation from hierarchy
-- **Temporal Marker Support**: Special handling for time-based patterns
-- **Mixin Selection**: Choose from available pattern mixins
-- **YAML Export**: Direct saving to pattern directory
-
-### 💬 Classification Chat
-- **Real-time Classification**: Send text and get instant pattern matches
-- **Confidence Scoring**: See confidence levels and alternatives
-- **Chat History**: Persistent session history
-- **Performance Metrics**: Processing time and system status
-- **Hot Path Integration**: Direct communication with Rust service
-
-### 🔍 System Monitoring
-- **Hot Path Status**: Real-time service health checks
-- **Pattern Statistics**: Live metrics on pattern collection
-- **Quick Actions**: Reload patterns, health checks
-- **Error Handling**: Clear error messages and troubleshooting
+- **🤖 Auto-Generated Forms**: UI components generated from JSON schemas
+- **🔄 Zero Schema Drift**: Automatic adaptation to schema changes  
+- **🎯 Perfect Consistency**: Same field names/types as hot path API
+- **⚡ Real-Time Classification**: Live hierarchical pattern matching
+- **📊 Schema Debugging**: Built-in schema inspection tools
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
 ```bash
-pip install -r ui/requirements.txt
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### 2. Start Hot Path Service (Required)
+### Run the System
 ```bash
-cd hot_path
-cargo run
+# Terminal 1: Start hot path service
+cd ../hot_path && cargo run --release
+
+# Terminal 2: Start schema-driven UI
+streamlit run app.py
 ```
 
-### 3. Launch UI
-```bash
-python ui/run_ui.py
-```
-
-The UI will be available at: **http://localhost:8501**
-
-## 📖 Usage Guide
-
-### Creating a New Pattern
-
-1. **Navigate to Pattern Creation** (🎨 Pattern Creation)
-2. **Fill in the 6-Level Hierarchy**:
-   - **Domain**: `child_development`, `self_state`, `relationship`
-   - **Area**: `sleep`, `feeding`, `play`, `conflict`
-   - **Topic**: `nap`, `breastfeeding`, `meltdown`
-   - **Theme**: `crib_nap`, `food_refusal`
-   - **Focus**: `early_am`, `afternoon`, `evening` (temporal markers)
-   - **Form**: `single_entry`, `recurring`, `shutdown`
-
-3. **Add Pattern Details**:
-   - Description for embedding
-   - Select relevant mixins
-   - Provide 3-5 sample texts
-
-4. **Validate and Save**:
-   - Preview generated pattern
-   - Validate against schema
-   - Save to patterns directory
-   - Reload hot path patterns
-
-### Testing Classification
-
-1. **Navigate to Classification Chat** (💬 Classification Chat)
-2. **Enter text to classify**: "She went down for her early morning nap without fuss"
-3. **View results**:
-   - Best match with confidence score
-   - Alternative matches
-   - Processing time
-4. **Check chat history** for previous classifications
+Open [http://localhost:8501](http://localhost:8501) in your browser.
 
 ## 🏗️ Architecture
 
+### Schema-Driven Generation
 ```
-┌─────────────────┐    HTTP/JSON    ┌──────────────────┐
-│   Streamlit UI  │ ←─────────────→ │  Rust Hot Path   │
-│   (Port 8501)   │                 │   (Port 3000)    │
-└─────────────────┘                 └──────────────────┘
-         │                                    │
-         │ File I/O                          │ In-Memory
-         ▼                                    ▼
-┌─────────────────┐                 ┌──────────────────┐
-│  Pattern Files  │                 │ Vector Store     │
-│   (YAML)        │                 │ (Embeddings)     │
-└─────────────────┘                 └──────────────────┘
+assets/schemas.json ──┐
+                      ├──> hot_path/build.rs ──> Rust Structs
+                      └──> ui/schema_driven_ui.py ──> Streamlit Forms
 ```
 
-### Component Integration
+### Components
 
-- **UI**: Streamlit web interface (Python)
-- **Cold Path**: Pattern creation and validation (Python)
-- **Hot Path**: Real-time classification (Rust)
-- **Storage**: YAML files + in-memory vector store
+- **`app.py`**: Main schema-driven application
+- **`schema_driven_ui.py`**: Automatic UI generator from JSON schemas
+- **`requirements.txt`**: Python dependencies
 
-## 🎯 Pattern Creation Workflow
+## 🔧 How It Works
 
-1. **Design Hierarchy** using the 6-level structure
-2. **Add Temporal Markers** when time context matters
-3. **Validate Schema** compliance
-4. **Test Classification** with sample texts
-5. **Iterate** based on classification results
-
-## 📊 Pattern Statistics
-
-The UI automatically tracks:
-- Total patterns in collection
-- Domain distribution
-- Temporal marker coverage
-- Classification accuracy metrics
-
-## 🔧 Troubleshooting
-
-### Hot Path Service Not Running
-```
-❌ Hot path service not running
-Start with: cd hot_path && cargo run
+### 1. **Schema Loading**
+```python
+generator = SchemaUIGenerator()
+# Automatically loads and parses assets/schemas.json
 ```
 
-### Pattern Validation Errors
-- Check hierarchy depth (2-6 levels)
-- Ensure required fields are filled
-- Verify sample texts are provided
-
-### Classification Not Working
-- Verify hot path service is running on port 3000
-- Check pattern reload after creating new patterns
-- Ensure patterns have embeddings
-
-## 🔗 Integration Points
-
-### API Endpoints Used
-- `GET /health` - Service health check
-- `GET /status` - System status and statistics
-- `POST /classify` - Text classification
-- `POST /reload-patterns` - Reload pattern index
-
-### File Structure
-```
-ui/
-├── app.py              # Main Streamlit application
-├── run_ui.py           # Launcher script
-├── requirements.txt    # Python dependencies
-└── README.md          # This file
-
-cold_path/
-└── patterns/          # Pattern YAML files (created via UI)
-
-hot_path/
-└── target/           # Rust service (must be running)
+### 2. **Form Generation**
+```python
+# Generates form from ClassificationRequest schema
+request_data = generator.generate_form("ClassificationRequest")
 ```
 
-## 🎨 UI Features
+### 3. **Response Display**
+```python
+# Displays response using ClassificationResponse schema
+generator.display_response(api_result)
+```
 
-### Modern Design
-- Gradient headers and modern styling
-- Color-coded result cards
-- Responsive layout
-- Interactive forms
+## 📋 Available Schemas
 
-### Real-time Feedback
-- Instant pattern validation
-- Live hierarchy breakdown
-- Real-time system status
-- Performance metrics
+The UI automatically detects and generates forms for:
 
-### User Experience
-- Guided pattern creation
-- Clear error messages
-- Persistent chat history
-- Quick action buttons
+- **PatternSchema**: Pattern creation and validation
+- **ClassificationRequest**: Classification input forms
+- **ClassificationResponse**: Result display formatting
+- **WeaveUnit**: Text input with metadata
+- **PatternMixin**: Enum selections
 
-## 📈 Performance
+## 🛠️ Schema-Driven Features
 
-- **Classification**: Sub-millisecond response times
-- **Pattern Creation**: Instant validation and preview
-- **Real-time Updates**: Live system status monitoring
-- **Scalability**: Handles hundreds of patterns efficiently
+### Automatic Field Types
+- **String fields** → Text inputs
+- **Number fields** → Sliders with min/max from schema
+- **Boolean fields** → Checkboxes
+- **Enum fields** → Select boxes
+- **Object fields** → Nested forms
+- **Array fields** → Dynamic lists
 
-## 🔄 Development Workflow
+### Smart Defaults
+- Uses schema `default` values
+- Applies field descriptions as help text
+- Validates required vs optional fields
+- Handles camelCase ↔ snake_case conversion
 
-1. **Create patterns** using the UI
-2. **Test classification** in chat interface
-3. **Monitor performance** via system status
-4. **Iterate patterns** based on results
-5. **Export/backup** pattern collection
+### Real-Time Adaptation
+When you update `assets/schemas.json`:
+1. **Hot path rebuilds** automatically (Rust structs)
+2. **UI updates** automatically (Python forms)
+3. **Zero code changes** needed
 
-The UI provides a complete development environment for building and testing pattern classification systems without requiring command-line expertise. 
+## 🧪 Testing
+
+### API Health Check
+```bash
+curl http://localhost:3000/health
+# Should return: OK
+```
+
+### Schema-Driven Classification
+```bash
+curl -X POST http://localhost:3000/classify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "weaveUnit": {"text": "she took a long nap"},
+    "maxAlternatives": 3,
+    "confidenceThreshold": 0.3
+  }'
+```
+
+### UI Schema Debug
+1. Open the UI at [http://localhost:8501](http://localhost:8501)
+2. Check the sidebar "Schema Debug Panel"
+3. View loaded models and field definitions
+
+## 🔍 Debugging
+
+### Schema Loading Issues
+```python
+# Test schema loading directly
+python -c "from schema_driven_ui import SchemaUIGenerator; gen = SchemaUIGenerator(); print(f'Loaded {len(gen.get_available_models())} models')"
+```
+
+### API Connection Issues
+```python
+# Test API connection
+python -c "import requests; r = requests.get('http://localhost:3000/health'); print(f'API: {r.text}')"
+```
+
+## 📊 Schema Information
+
+The UI displays real-time schema information:
+- **Schema Version**: From `assets/schemas.json`
+- **Available Models**: Auto-detected from schema
+- **Field Counts**: Required vs optional fields
+- **Generation Source**: Shows schema origin
+
+## 🚀 Benefits Over Manual UI
+
+| Manual Approach | Schema-Driven |
+|-----------------|---------------|
+| ❌ Hardcoded fields | ✅ Auto-generated |
+| ❌ Field name mismatches | ✅ Perfect consistency |
+| ❌ Manual updates needed | ✅ Automatic adaptation |
+| ❌ Error-prone | ✅ Schema-validated |
+| ❌ Maintenance burden | ✅ Zero maintenance |
+
+## 🔮 Future Enhancements
+
+- **Multi-language support** (TypeScript, Go, etc.)
+- **Advanced validation** (regex patterns, custom rules)
+- **Theme customization** (schema-driven styling)
+- **Real-time collaboration** (shared schema updates)
+
+---
+
+**Built with ❤️ using schema-driven architecture - because consistency matters!** 

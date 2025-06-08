@@ -1,149 +1,147 @@
+use uuid::Uuid;
+use crate::{
+    classifier::HierarchicalClassifier,
+    config::Config,
+    generated::{ClassificationRequest, PatternMatch},
+    stats::StatsTracker,
+};
+use serde::Serialize;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{info, warn, error};
+use tokio::sync::Mutex;
+use tracing::{info, error};
+use axum::{extract::State, Json};
 use serde_json;
 
-use crate::generated::*;
-use crate::config::Config;
-use crate::classifier::PatternClassifier;
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiClassificationResponse {
+    pub request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_result: Option<PatternMatch>,
+    pub alternatives: Vec<PatternMatch>,
+    pub classification_steps: Vec<String>,
+    pub processing_time_ms: f64,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
 
 #[derive(Clone)]
 pub struct ClassificationService {
-    classifier: Arc<PatternClassifier>,
-    config: Config,
-    stats: Arc<RwLock<ServiceStats>>,
-}
-
-#[derive(Debug, Default)]
-struct ServiceStats {
-    requests_processed: u64,
-    total_processing_time_ms: f64,
-    errors: u64,
+    classifier: Arc<HierarchicalClassifier>,
+    stats: Arc<Mutex<StatsTracker>>,
 }
 
 impl ClassificationService {
-    pub async fn new(config: Config) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        info!("🔧 Initializing Classification Service");
+    pub async fn new(config: Config) -> Result<Self, Box<dyn std::error::Error>> {
+        info!("🚀 Initializing classification service...");
         
-        let classifier = Arc::new(PatternClassifier::new(config.clone()).await?);
+        let classifier = Arc::new(HierarchicalClassifier::new(config.clone()).await?);
+        let stats = Arc::new(Mutex::new(StatsTracker::new()));
         
-        let service = Self {
-            classifier,
-            config,
-            stats: Arc::new(RwLock::new(ServiceStats::default())),
-        };
-        
-        info!("✅ Classification Service initialized");
-        Ok(service)
+        info!("✅ Classification service initialized successfully");
+        Ok(Self { classifier, stats })
     }
-
-    pub async fn classify(&self, request: &ClassificationRequest) -> Result<ClassificationResponse, Box<dyn std::error::Error + Send + Sync>> {
+    
+    pub async fn classify_hierarchical(&self, request: &ClassificationRequest) -> Result<ApiClassificationResponse, Box<dyn std::error::Error + Send + Sync>> {
         let start_time = std::time::Instant::now();
+        let request_id = Uuid::new_v4().to_string();
         
-        // Validate request
         if request.weave_unit.text.trim().is_empty() {
             let processing_time = start_time.elapsed().as_millis() as f64;
-            return Ok(ClassificationResponse::error(
-                "Empty text provided".to_string(),
-                processing_time
-            ));
+            return Ok(ApiClassificationResponse {
+                request_id,
+                match_result: None,
+                alternatives: vec![],
+                classification_steps: vec!["Error: Empty text provided".to_string()],
+                processing_time_ms: processing_time,
+                status: "error".to_string(),
+                error_message: Some("Empty text provided".to_string()),
+            });
         }
         
-        // Perform classification
-        let result = self.classifier.classify(
+        let (primary_match, alternatives, steps) = self.classifier.classify(
             &request.weave_unit.text,
-            request.confidence_threshold,
-            request.max_alternatives as usize,
-            request.filter_by_domain.as_deref(),
-        ).await;
+            request.confidence_threshold.unwrap_or(0.5),
+            request.max_alternatives.unwrap_or(3) as usize,
+        ).await?;
         
         let processing_time = start_time.elapsed().as_millis() as f64;
         
-        // Update stats
-        self.update_stats(processing_time, result.is_ok()).await;
+        self.stats.lock().await.log_request(processing_time);
         
-        match result {
-            Ok((primary_match, alternatives)) => {
-                Ok(ClassificationResponse::success(
-                    primary_match,
-                    alternatives,
-                    processing_time
-                ))
-            },
-            Err(e) => {
-                error!("Classification failed: {}", e);
-                Ok(ClassificationResponse::error(
-                    format!("Classification error: {}", e),
-                    processing_time
-                ))
-            }
-        }
-    }
-
-    pub async fn get_status(&self) -> serde_json::Value {
-        let stats = self.stats.read().await;
-        let vector_store_healthy = self.check_vector_store_health().await;
-        let vector_store_stats = self.classifier.get_stats().await.unwrap_or_else(|_| serde_json::json!({}));
-        
-        serde_json::json!({
-            "service": "pattern-classifier-hot-path",
-            "status": if vector_store_healthy { "healthy" } else { "degraded" },
-            "vector_store_connection": vector_store_healthy,
-            "config": {
-                "collection": self.config.collection_name,
-                "confidence_threshold": self.config.confidence_threshold,
-                "max_alternatives": self.config.max_alternatives
-            },
-            "runtime_stats": {
-                "requests_processed": stats.requests_processed,
-                "average_processing_time_ms": if stats.requests_processed > 0 {
-                    stats.total_processing_time_ms / stats.requests_processed as f64
-                } else { 0.0 },
-                "errors": stats.errors,
-                "error_rate": if stats.requests_processed > 0 {
-                    stats.errors as f64 / stats.requests_processed as f64
-                } else { 0.0 }
-            },
-            "vector_store_stats": vector_store_stats
+        Ok(ApiClassificationResponse {
+            request_id,
+            match_result: primary_match,
+            alternatives,
+            classification_steps: steps,
+            processing_time_ms: processing_time,
+            status: "success".to_string(),
+            error_message: None,
         })
     }
-
-    async fn update_stats(&self, processing_time_ms: f64, success: bool) {
-        let mut stats = self.stats.write().await;
-        stats.requests_processed += 1;
-        stats.total_processing_time_ms += processing_time_ms;
-        if !success {
-            stats.errors += 1;
-        }
-    }
-
-    async fn check_vector_store_health(&self) -> bool {
-        match self.classifier.health_check().await {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+    
+    pub async fn reload_patterns(&self) -> Result<Json<serde_json::Value>, Box<dyn std::error::Error>> {
+        info!("🔄 Reloading patterns...");
+        let patterns_loaded = self.classifier.load_patterns_from_file("assets/patterns_with_embeddings.json").await?;
+        let levels_loaded = self.classifier.load_level_schemas("assets/level_schemas_with_embeddings.json").await?;
+        
+        Ok(Json(serde_json::json!({
+            "status": "success",
+            "patterns_loaded": patterns_loaded,
+            "levels_loaded": levels_loaded
+        })))
     }
     
-    /// Reload patterns from file
-    pub async fn reload_patterns(&self, file_path: Option<String>) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-        let path = file_path.unwrap_or_else(|| "assets/patterns_with_embeddings.json".to_string());
-        
-        info!("🔄 Reloading patterns from: {}", path);
-        
-        match self.classifier.load_patterns_from_file(&path).await {
-            Ok(count) => {
-                info!("✅ Successfully reloaded {} patterns", count);
-                Ok(serde_json::json!({
-                    "status": "success",
-                    "message": format!("Reloaded {} patterns from {}", count, path),
-                    "patterns_loaded": count,
-                    "file_path": path
-                }))
-            },
+    pub async fn get_status(&self) -> Result<Json<serde_json::Value>, Box<dyn std::error::Error>> {
+        let stats = self.stats.lock().await;
+        self.classifier.health_check().await?;
+        Ok(Json(serde_json::json!({
+            "status": "ok",
+            "stats": stats.get_summary()
+        })))
+    }
+}
+
+pub mod handlers {
+    use super::{ClassificationService, ApiClassificationResponse};
+    use axum::{extract::State, Json};
+    use crate::generated::ClassificationRequest;
+    use tracing::debug;
+    use uuid::Uuid;
+
+    pub async fn health_check() -> &'static str { "OK" }
+
+    pub async fn classify_handler(
+        State(service): State<ClassificationService>,
+        Json(request): Json<ClassificationRequest>,
+    ) -> Json<ApiClassificationResponse> {
+        debug!("Received classification request: {:?}", request);
+        match service.classify_hierarchical(&request).await {
+            Ok(response) => Json(response),
             Err(e) => {
-                error!("❌ Failed to reload patterns: {}", e);
-                Err(format!("Failed to reload patterns: {}", e).into())
+                Json(ApiClassificationResponse {
+                    request_id: Uuid::new_v4().to_string(),
+                    match_result: None,
+                    alternatives: vec![],
+                    classification_steps: vec![e.to_string()],
+                    processing_time_ms: 0.0,
+                    status: "error".to_string(),
+                    error_message: Some(e.to_string()),
+                })
             }
         }
+    }
+
+    pub async fn status_handler(
+        State(service): State<ClassificationService>,
+    ) -> Result<Json<serde_json::Value>, axum::http::StatusCode> {
+        service.get_status().await.map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+    }
+
+    pub async fn reload_patterns_handler(
+        State(service): State<ClassificationService>,
+    ) -> Result<Json<serde_json::Value>, axum::http::StatusCode> {
+        service.reload_patterns().await.map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)
     }
 } 

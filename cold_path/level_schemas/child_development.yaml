@@ -1,0 +1,19 @@
+id: "child_development"
+level: "domain"
+name: "Child Development"
+description: "All patterns related to child growth, learning, behavior, and developmental milestones. Includes sleep, play, feeding, emotional regulation, skill acquisition, and child-focused activities."
+examples:
+  - "She went down for her nap easily today"
+  - "He played at the park this afternoon"
+  - "The baby refused to eat lunch"
+  - "Toddler meltdown at bedtime"
+  - "He's starting to talk more"
+  - "First day of school went well"
+  - "She learned to walk yesterday"
+  - "Building blocks together"
+  - "Story time before bed"
+  - "Playground adventures"
+metadata:
+  typical_age_range: "0-18 years"
+  primary_focus: "child_centered_activities"
+  includes_areas: ["sleep", "play", "feeding", "learning", "emotional_regulation"] 

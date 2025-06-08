@@ -223,6 +223,91 @@ def index_build(
 
 
 @app.command()
+def build_level_embeddings(
+    level_schemas_dir: str = typer.Option("cold_path/level_schemas", "--level-schemas-dir", help="Level schemas directory"),
+    model_name: str = typer.Option("all-MiniLM-L6-v2", "--model", help="Embedding model"),
+    output_file: str = typer.Option("assets/level_schemas_with_embeddings.json", "--output", help="Output JSON file"),
+):
+    """
+    🏗️ Build embeddings for level schemas and export to JSON
+    """
+    import json
+    import os
+    from sentence_transformers import SentenceTransformer
+    from .level_loader import LevelSchemaLoader
+    
+    print("🏗️ Building Level Schema Embeddings")
+    print(f"📂 Level schemas directory: {level_schemas_dir}")
+    print(f"🤖 Embedding model: {model_name}")
+    print(f"📄 Output file: {output_file}")
+    print()
+    
+    # Load level schemas
+    loader = LevelSchemaLoader(level_schemas_dir)
+    all_levels = loader.load_all_levels()
+    
+    if not all_levels:
+        print("❌ No level schemas found!")
+        raise typer.Exit(1)
+    
+    print(f"📋 Loaded {len(all_levels)} level schemas")
+    
+    # Group by hierarchy level
+    by_hierarchy = {}
+    for level in all_levels:
+        if level.level.value not in by_hierarchy:
+            by_hierarchy[level.level.value] = 0
+        by_hierarchy[level.level.value] += 1
+    
+    for hierarchy_level, count in by_hierarchy.items():
+        print(f"   {hierarchy_level}: {count} schemas")
+    print()
+    
+    # Initialize embedding model
+    print(f"🤖 Loading embedding model: {model_name}")
+    model = SentenceTransformer(model_name)
+    print(f"✅ Model loaded - embedding dimension: {model.get_sentence_embedding_dimension()}")
+    print()
+    
+    # Generate embeddings
+    print("🔄 Generating embeddings...")
+    level_data = []
+    
+    for level in all_levels:
+        # Get combined text for embedding (description + examples)
+        embedding_text = level.get_embedding_text()
+        
+        # Generate embedding
+        embedding = model.encode(embedding_text).tolist()
+        
+        # Prepare level data
+        level_dict = {
+            "id": level.id,
+            "level": level.level.value,
+            "name": level.name,
+            "description": level.description,
+            "examples": level.examples,
+            "parent_id": level.parent_id,
+            "metadata": level.metadata,
+            "embedding": embedding
+        }
+        
+        level_data.append(level_dict)
+        print(f"   ✅ {level.level.value}/{level.id}")
+    
+    # Save to JSON
+    print(f"\n💾 Saving to: {output_file}")
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    with open(output_file, 'w') as f:
+        json.dump(level_data, f, indent=2)
+    
+    print(f"✅ Level embeddings exported: {len(level_data)} schemas")
+    print(f"📄 File size: {os.path.getsize(output_file)} bytes")
+    print(f"🎯 Ready for Rust consumption!")
+
+
+@app.command()
 def temporal_analysis(
     patterns_dir: str = typer.Option("cold_path/patterns", "--patterns-dir", help="Directory containing pattern YAML files"),
     test_patterns_dir: str = typer.Option("test_patterns", "--test-patterns-dir", help="Directory containing test patterns")

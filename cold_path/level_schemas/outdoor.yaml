@@ -1,0 +1,25 @@
+id: "outdoor"
+level: "topic"
+name: "Outdoor Play"
+description: "Outside activities, fresh air play, playground time, nature exploration, park visits, backyard activities, and outdoor recreation. Includes running, climbing, swings, slides, and active outdoor engagement."
+examples:
+  - "Playing at the park"
+  - "Backyard adventures"
+  - "Playground time"
+  - "Nature exploration walk"
+  - "Outdoor games and activities"
+  - "Fresh air and exercise"
+  - "Garden play time"
+  - "Park visit this afternoon"
+  - "Swings and slides"
+  - "Running around outside"
+  - "Climbing on playground equipment"
+  - "Outdoor adventure"
+  - "Playing in the sunshine"
+  - "Active time at the park"
+parent_id: "play"
+metadata:
+  location: "outside"
+  weather_dependent: true
+  equipment_often_involved: ["playground", "park", "backyard"]
+  includes_themes: ["park", "backyard", "playground", "nature"] 

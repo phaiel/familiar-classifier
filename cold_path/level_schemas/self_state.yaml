@@ -1,0 +1,16 @@
+id: "self_state"
+level: "domain"
+name: "Self State"
+description: "Internal psychological, emotional, and physiological states of caregivers or adults. Includes stress, overwhelm, energy levels, personal well-being, and emotional regulation."
+examples:
+  - "I'm feeling overwhelmed by all the noise"
+  - "Need some quiet time to recharge"
+  - "Sensory overload hitting hard right now"
+  - "Everything feels too much right now"
+  - "Feeling exhausted after a long day"
+  - "Running on empty today"
+  - "Too much stimulation, need to retreat"
+metadata:
+  focus: "adult_caregiver_states"
+  emotional_component: true
+  includes_areas: ["emotional_regulation", "stress_response", "energy_management"] 

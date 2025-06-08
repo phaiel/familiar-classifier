@@ -11,7 +11,6 @@ class PatternMixin(str, Enum):
     """Available mixins for patterns."""
     TIME = "time"
     EMOTION = "emotion"
-    THREAD_LINK = "thread_link"
     LOCATION = "location"
     PERSON = "person"
     ACTIVITY = "activity"

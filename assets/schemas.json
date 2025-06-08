@@ -9,7 +9,6 @@
           "enum": [
             "time",
             "emotion",
-            "thread_link",
             "location",
             "person",
             "activity",
@@ -20,10 +19,10 @@
           "type": "string"
         }
       },
-      "description": "Schema for pattern definitions.",
+      "description": "Schema for pattern definitions with 6-level hierarchy.",
       "properties": {
         "id": {
-          "description": "Hierarchical pattern ID (e.g., 'child_development/sleep/nap/crib/early_am')",
+          "description": "Hierarchical pattern ID: domain/area/topic/theme/focus/form",
           "title": "Id",
           "type": "string"
         },
@@ -58,10 +57,10 @@
             }
           ],
           "default": null,
-          "description": "Top-level domain (extracted from id)",
+          "description": "Highest-level conceptual group (e.g. self_state, child_development)",
           "title": "Domain"
         },
-        "category": {
+        "area": {
           "anyOf": [
             {
               "type": "string"
@@ -71,8 +70,60 @@
             }
           ],
           "default": null,
-          "description": "Category (extracted from id)",
-          "title": "Category"
+          "description": "Life zone or interaction type (e.g. sleep, feeding, play)",
+          "title": "Area"
+        },
+        "topic": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Functional grouping (e.g. nap, breastfeeding, toddler_meltdown)",
+          "title": "Topic"
+        },
+        "theme": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conceptual behavior cluster (e.g. crib_nap, midday_nap)",
+          "title": "Theme"
+        },
+        "focus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Leaf-like structural subdivision (e.g. early_am, afternoon)",
+          "title": "Focus"
+        },
+        "form": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Final pattern node (e.g. single_entry, recurring)",
+          "title": "Form"
         },
         "metadata": {
           "additionalProperties": true,
@@ -437,7 +488,6 @@
       "enum": [
         "time",
         "emotion",
-        "thread_link",
         "location",
         "person",
         "activity",

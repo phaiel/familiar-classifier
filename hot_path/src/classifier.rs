@@ -1,448 +1,216 @@
-use anyhow::{anyhow, Result};
-use std::sync::Arc;
-use tracing::{info, warn, error};
 use std::collections::HashMap;
-use serde_json::{self, Value};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
+use anyhow::{anyhow, Result};
+use tracing::{info, warn, debug};
+use serde_json::Value;
 
-use crate::config::Config;
 use crate::embeddings::EmbeddingGenerator;
-use crate::generated::*;
+use crate::config::Config;
+use crate::generated::PatternMatch;
 
-// Simple in-memory vector store - embedded directly to avoid import issues
 #[derive(Debug, Clone)]
 struct VectorPoint {
-    pub id: String,
     pub vector: Vec<f32>,
     pub payload: HashMap<String, Value>,
-    pub score: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
-struct VectorStore {
-    points: Arc<RwLock<HashMap<String, VectorPoint>>>,
-    next_id: Arc<RwLock<u64>>,
+struct LevelSchema {
+    pub id: String,
+    pub level: String,
+    pub parent_id: Option<String>,
+    pub embedding: Vec<f32>,
 }
 
-impl VectorStore {
-    fn new() -> Self {
-        Self {
-            points: Arc::new(RwLock::new(HashMap::new())),
-            next_id: Arc::new(RwLock::new(1)),
-        }
-    }
-
-    fn add_point(&self, id: Option<String>, vector: Vec<f32>, payload: HashMap<String, Value>) -> Result<String> {
-        let point_id = match id {
-            Some(id) => id,
-            None => {
-                let mut next_id = self.next_id.write().map_err(|_| anyhow!("Lock failed"))?;
-                let id = format!("point_{}", *next_id);
-                *next_id += 1;
-                id
-            }
-        };
-
-        let point = VectorPoint {
-            id: point_id.clone(),
-            vector,
-            payload,
-            score: None,
-        };
-
-        let mut points = self.points.write().map_err(|_| anyhow!("Lock failed"))?;
-        points.insert(point_id.clone(), point);
-        Ok(point_id)
-    }
-
-    fn search(&self, query_vector: Vec<f32>, limit: usize, score_threshold: Option<f32>, filter: Option<HashMap<String, Value>>) -> Result<Vec<VectorPoint>> {
-        let points = self.points.read().map_err(|_| anyhow!("Lock failed"))?;
-        let mut scored_points = Vec::new();
-
-        for point in points.values() {
-            // Apply filter if specified
-            if let Some(ref filter_criteria) = filter {
-                let mut matches_filter = true;
-                for (key, expected_value) in filter_criteria {
-                    match point.payload.get(key) {
-                        Some(actual_value) if actual_value == expected_value => {}
-                        _ => {
-                            matches_filter = false;
-                            break;
-                        }
-                    }
-                }
-                if !matches_filter {
-                    continue;
-                }
-            }
-
-            // Calculate cosine similarity
-            let similarity = cosine_similarity(&query_vector, &point.vector)?;
-            
-            // Apply score threshold
-            if let Some(threshold) = score_threshold {
-                if similarity < threshold {
-                    continue;
-                }
-            }
-
-            let mut scored_point = point.clone();
-            scored_point.score = Some(similarity);
-            scored_points.push(scored_point);
-        }
-
-        // Sort by score (highest first)
-        scored_points.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-        scored_points.truncate(limit);
-        Ok(scored_points)
-    }
-
-    fn count(&self) -> Result<usize> {
-        let points = self.points.read().map_err(|_| anyhow!("Lock failed"))?;
-        Ok(points.len())
-    }
-
-    fn stats(&self) -> Result<HashMap<String, Value>> {
-        let points = self.points.read().map_err(|_| anyhow!("Lock failed"))?;
-        let mut domain_counts: HashMap<String, u32> = HashMap::new();
-        
-        for point in points.values() {
-            if let Some(domain) = point.payload.get("domain").and_then(|v| v.as_str()) {
-                *domain_counts.entry(domain.to_string()).or_insert(0) += 1;
-            }
-        }
-
-        let mut stats = HashMap::new();
-        stats.insert("total_points".to_string(), Value::Number(points.len().into()));
-        stats.insert("domains".to_string(), Value::Object(
-            domain_counts.into_iter()
-                .map(|(k, v)| (k, Value::Number(v.into())))
-                .collect()
-        ));
-        stats.insert("storage_type".to_string(), Value::String("in_memory".to_string()));
-        Ok(stats)
-    }
-}
-
-fn cosine_similarity(a: &[f32], b: &[f32]) -> Result<f32> {
-    if a.len() != b.len() {
-        return Err(anyhow!("Vector dimensions don't match: {} vs {}", a.len(), b.len()));
-    }
-
-    let mut dot_product = 0.0;
-    let mut norm_a = 0.0;
-    let mut norm_b = 0.0;
-
-    for i in 0..a.len() {
-        dot_product += a[i] * b[i];
-        norm_a += a[i] * a[i];
-        norm_b += b[i] * b[i];
-    }
-
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return Ok(0.0);
-    }
-
-    Ok(dot_product / (norm_a.sqrt() * norm_b.sqrt()))
-}
-
-/// Simple in-memory pattern classifier - no external dependencies!
-pub struct PatternClassifier {
-    vector_store: VectorStore,
+/// A lean, mean, hierarchical classifier.
+/// This struct holds both the level schemas for navigation and the final pattern vectors.
+pub struct HierarchicalClassifier {
+    patterns: Arc<RwLock<HashMap<String, VectorPoint>>>,
+    level_schemas: Arc<RwLock<Vec<LevelSchema>>>,
     embedding_generator: Arc<EmbeddingGenerator>,
-    config: Config,
 }
 
-impl PatternClassifier {
-    /// Create a new in-memory pattern classifier
-    pub async fn new(config: Config) -> Result<Self> {
-        info!("🔥 Initializing In-Memory Pattern Classifier");
-        
-        // Initialize vector store
-        let vector_store = VectorStore::new();
-        
-        // Initialize embedding generator
-        let embedding_generator = Arc::new(
-            EmbeddingGenerator::new("all-MiniLM-L6-v2").await?
-        );
+impl HierarchicalClassifier {
+    pub async fn new(_config: Config) -> Result<Self> {
+        info!("🔥 Initializing Hierarchical Classifier");
         
         let classifier = Self {
-            vector_store,
-            embedding_generator,
-            config,
+            patterns: Arc::new(RwLock::new(HashMap::new())),
+            level_schemas: Arc::new(RwLock::new(Vec::new())),
+            embedding_generator: Arc::new(EmbeddingGenerator::new("all-MiniLM-L6-v2").await?),
         };
         
-        // Try to load patterns from the cold path export
         if let Err(e) = classifier.load_patterns_from_file("assets/patterns_with_embeddings.json").await {
-            warn!("⚠️  Could not load patterns from file: {}", e);
-            info!("🔄 Starting with empty vector store - patterns can be loaded later");
+            warn!("⚠️  Could not load patterns: {}", e);
+        }
+        if let Err(e) = classifier.load_level_schemas("assets/level_schemas_with_embeddings.json").await {
+            warn!("⚠️  Could not load level schemas: {}", e);
         }
         
-        info!("✅ In-memory pattern classifier initialized");
-        
+        info!("✅ Hierarchical Classifier initialized");
         Ok(classifier)
     }
     
-    /// Load patterns from JSON file (generated by cold path)
     pub async fn load_patterns_from_file(&self, file_path: &str) -> Result<usize> {
-        use std::fs;
-        use serde_json::Value;
-        
         info!("📂 Loading patterns from: {}", file_path);
+        let pattern_data: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(file_path)?)?;
         
-        // Read and parse JSON file
-        let file_content = fs::read_to_string(file_path)
-            .map_err(|e| anyhow!("Failed to read file {}: {}", file_path, e))?;
+        let mut patterns = self.patterns.write().map_err(|_| anyhow!("Lock failed"))?;
+        patterns.clear();
         
-        let patterns: Vec<Value> = serde_json::from_str(&file_content)
-            .map_err(|e| anyhow!("Failed to parse JSON: {}", e))?;
-        
-        info!("📋 Found {} patterns in file", patterns.len());
-        
-        let mut loaded_count = 0;
-        
-        for pattern in patterns {
-            // Extract pattern data
-            let id = pattern.get("id")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow!("Pattern missing 'id' field"))?;
+        for pattern in pattern_data {
+            let id = pattern.get("id").and_then(|v| v.as_str()).ok_or_else(|| anyhow!("Missing pattern id"))?;
+            let embedding: Vec<f32> = pattern.get("embedding").and_then(|v| v.as_array())
+                .ok_or_else(|| anyhow!("Missing embedding"))?
+                .iter().map(|v| v.as_f64().unwrap_or(0.0) as f32).collect();
             
-            let description = pattern.get("description")
-                .and_then(|v| v.as_str())
-                .unwrap_or("No description");
+            if embedding.len() != 384 { continue; }
             
-            let domain = pattern.get("domain")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            
-            let sample_texts = pattern.get("sample_texts")
-                .and_then(|v| v.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_str())
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()
-                })
-                .unwrap_or_default();
-            
-            let metadata = pattern.get("metadata")
-                .and_then(|v| v.as_object())
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .map(|(k, v)| (k, v))
-                .collect::<HashMap<String, Value>>();
-            
-            // Get the pre-computed embedding
-            let embedding = pattern.get("embedding")
-                .and_then(|v| v.as_array())
-                .ok_or_else(|| anyhow!("Pattern '{}' missing embedding", id))?
-                .iter()
-                .map(|v| v.as_f64().unwrap_or(0.0) as f32)
-                .collect::<Vec<f32>>();
-            
-            if embedding.len() != 384 {
-                warn!("⚠️  Pattern '{}' has embedding dimension {} (expected 384)", id, embedding.len());
-                continue;
-            }
-            
-            // Add to vector store using the pre-computed embedding
             let mut payload = HashMap::new();
             payload.insert("pattern_id".to_string(), Value::String(id.to_string()));
-            payload.insert("description".to_string(), Value::String(description.to_string()));
-            
-            if let Some(ref domain) = domain {
-                payload.insert("domain".to_string(), Value::String(domain.clone()));
+            if let Some(desc) = pattern.get("description").and_then(|v| v.as_str()) {
+                payload.insert("description".to_string(), Value::String(desc.to_string()));
+            }
+            if let Some(domain) = pattern.get("domain").and_then(|v| v.as_str()) {
+                payload.insert("domain".to_string(), Value::String(domain.to_string()));
             }
             
-            // Add custom metadata
-            for (key, value) in &metadata {
-                payload.insert(key.clone(), value.clone());
-            }
-            
-            // Add sample texts as a combined field (for reference)
-            if !sample_texts.is_empty() {
-                payload.insert("sample_texts".to_string(), Value::Array(
-                    sample_texts.iter().map(|s| Value::String(s.clone())).collect()
-                ));
-                payload.insert("primary_text".to_string(), Value::String(sample_texts[0].clone()));
-            }
-            
-            // Add the pattern with pre-computed embedding
-            let point_id = id.replace("/", "_");
-            self.vector_store.add_point(Some(point_id), embedding, payload)?;
-            
-            loaded_count += 1;
+            patterns.insert(id.replace("/", "_"), VectorPoint { vector: embedding, payload });
         }
         
-        info!("✅ Successfully loaded {} patterns into vector store", loaded_count);
-        Ok(loaded_count)
+        let count = patterns.len();
+        info!("✅ Loaded {} patterns", count);
+        Ok(count)
     }
     
-    /// Add patterns to the vector store (called from cold path)
-    pub async fn add_pattern(
-        &self,
-        pattern_id: String,
-        description: String,
-        sample_texts: Vec<String>,
-        domain: Option<String>,
-        metadata: HashMap<String, Value>
-    ) -> Result<()> {
-        // Generate embeddings for all sample texts
-        for (i, text) in sample_texts.iter().enumerate() {
-            let embedding = self.embedding_generator.encode(text).await?;
+    pub async fn load_level_schemas(&self, file_path: &str) -> Result<usize> {
+        info!("📂 Loading level schemas from: {}", file_path);
+        let level_data: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(file_path)?)?;
+        
+        let mut schemas = self.level_schemas.write().map_err(|_| anyhow!("Lock failed"))?;
+        schemas.clear();
+        
+        for item in level_data {
+            let id = item.get("id").and_then(|v| v.as_str()).ok_or_else(|| anyhow!("Missing id"))?;
+            let level = item.get("level").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let parent_id = item.get("parent_id").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let embedding: Vec<f32> = item.get("embedding").and_then(|v| v.as_array())
+                .ok_or_else(|| anyhow!("Missing embedding"))?
+                .iter().map(|v| v.as_f64().unwrap_or(0.0) as f32).collect();
             
-            let point_id = format!("{}_{}", pattern_id.replace("/", "_"), i);
+            if embedding.len() != 384 { continue; }
             
-            let mut payload = HashMap::new();
-            payload.insert("pattern_id".to_string(), Value::String(pattern_id.clone()));
-            payload.insert("description".to_string(), Value::String(description.clone()));
-            payload.insert("sample_text".to_string(), Value::String(text.clone()));
-            payload.insert("text_index".to_string(), Value::Number((i as u64).into()));
-            
-            if let Some(ref domain) = domain {
-                payload.insert("domain".to_string(), Value::String(domain.clone()));
-            }
-            
-            // Add custom metadata
-            for (key, value) in &metadata {
-                payload.insert(key.clone(), value.clone());
-            }
-            
-            self.vector_store.add_point(Some(point_id), embedding, payload)?;
+            schemas.push(LevelSchema { id: id.to_string(), level: level.to_string(), parent_id, embedding });
         }
         
-        info!("📝 Added pattern '{}' with {} sample texts", pattern_id, sample_texts.len());
-        Ok(())
+        let count = schemas.len();
+        info!("✅ Loaded {} level schemas", count);
+        Ok(count)
     }
     
-    /// Classify text using in-memory vector search
-    pub async fn classify(
-        &self, 
-        text: &str,
-        confidence_threshold: f64,
-        max_alternatives: usize,
-        filter_by_domain: Option<&str>,
-    ) -> Result<(Option<PatternMatch>, Vec<PatternMatch>)> {
-        
-        // Generate embedding
+    pub async fn classify(&self, text: &str, confidence_threshold: f64, max_alternatives: usize) -> Result<(Option<PatternMatch>, Vec<PatternMatch>, Vec<String>)> {
+        let mut steps = Vec::new();
         let embedding = self.embedding_generator.encode(text).await?;
+
+        // Step 1 & 2 & 3: Find the best hierarchical path (Domain -> Area -> Topic)
+        let domain_candidates = self.classify_at_level(&embedding, "domain", None).await?;
+        if domain_candidates.is_empty() { return Ok((None, vec![], vec!["No domain matches found.".into()])); }
+        let (best_domain, domain_conf) = &domain_candidates[0];
+        steps.push(format!("✅ Domain: {} ({:.1}%)", best_domain, domain_conf * 100.0));
+
+        let area_candidates = self.classify_at_level(&embedding, "area", Some(best_domain)).await?;
+        if area_candidates.is_empty() { return Ok((None, vec![], steps)); }
+        let (best_area, area_conf) = &area_candidates[0];
+        steps.push(format!("✅ Area: {} ({:.1}%)", best_area, area_conf * 100.0));
+
+        let topic_candidates = self.classify_at_level(&embedding, "topic", Some(best_area)).await?;
+        if topic_candidates.is_empty() { return Ok((None, vec![], steps)); }
+        let (best_topic, topic_conf) = &topic_candidates[0];
+        steps.push(format!("✅ Topic: {} ({:.1}%)", best_topic, topic_conf * 100.0));
         
-        // Build filter if domain specified
-        let filter = if let Some(domain) = filter_by_domain {
-            let mut filter_map = HashMap::new();
-            filter_map.insert("domain".to_string(), Value::String(domain.to_string()));
-            Some(filter_map)
-        } else {
-            None
-        };
-        
-        // Perform search
-        let search_results = self.vector_store.search(
-            embedding,
-            max_alternatives + 5, // Get a few extra to account for duplicates
-            Some(confidence_threshold as f32),
-            filter,
-        )?;
-        
-        // Process results - deduplicate by pattern_id and keep best score
-        let mut pattern_scores: HashMap<String, (f64, VectorPoint)> = HashMap::new();
-        
-        for point in search_results {
-            let pattern_id = point.payload.get("pattern_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string();
-            
-            let score = point.score.unwrap_or(0.0) as f64;
-            
-            // Keep the best score for each pattern
-            match pattern_scores.get(&pattern_id) {
-                Some((existing_score, _)) if score <= *existing_score => {
-                    // Skip this one, we have a better score
-                }
-                _ => {
-                    pattern_scores.insert(pattern_id, (score, point));
-                }
-            }
+        // Step 4: Run vector search ONLY within the identified subspace
+        let pattern_prefix = format!("{}/{}/{}", best_domain, best_area, best_topic);
+        let final_candidates = self.find_patterns_in_subspace(&embedding, &pattern_prefix, confidence_threshold, max_alternatives).await?;
+
+        if final_candidates.is_empty() {
+            steps.push(format!("❌ No final pattern matches found under '{}' with threshold > {:.1}%", pattern_prefix, confidence_threshold * 100.0));
+            return Ok((None, Vec::new(), steps));
         }
+
+        // Step 5: Apply confidence weighting to the results from the correct subspace
+        let mut results: Vec<PatternMatch> = final_candidates.into_iter().map(|(pattern_id, pattern_similarity, _point)| {
+            // New confidence: pattern's cosine score blended with the confidence of the hierarchical path.
+            let final_confidence = pattern_similarity * (domain_conf * 0.4 + area_conf * 0.3 + topic_conf * 0.3);
+            PatternMatch {
+                pattern_id,
+                confidence: final_confidence,
+                ..Default::default()
+            }
+        }).collect();
         
-        // Convert to PatternMatch and sort by score
-        let mut matches: Vec<(f64, PatternMatch)> = pattern_scores
-            .into_iter()
-            .map(|(pattern_id, (score, point))| {
-                let mut metadata = HashMap::new();
-                
-                // Extract metadata
-                if let Some(domain) = point.payload.get("domain").and_then(|v| v.as_str()) {
-                    metadata.insert("domain".to_string(), Value::String(domain.to_string()));
-                }
-                if let Some(desc) = point.payload.get("description").and_then(|v| v.as_str()) {
-                    metadata.insert("description".to_string(), Value::String(desc.to_string()));
-                }
-                if let Some(sample) = point.payload.get("sample_text").and_then(|v| v.as_str()) {
-                    metadata.insert("sample_text".to_string(), Value::String(sample.to_string()));
-                }
-                
-                let pattern_match = PatternMatch {
-                    pattern_id,
-                    confidence: score,
-                    alternatives: Vec::new(),
-                    embedding_vector: None,
-                    metadata,
-                };
-                
-                (score, pattern_match)
+        results.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        
+        let primary = results.remove(0);
+        steps.push(format!("🎯 Final: {} ({:.1}%)", primary.pattern_id, primary.confidence * 100.0));
+
+        Ok((Some(primary), results, steps))
+    }
+    
+    async fn classify_at_level(&self, embedding: &[f32], level: &str, parent_filter: Option<&str>) -> Result<Vec<(String, f64)>> {
+        let schemas = self.level_schemas.read().map_err(|_| anyhow!("Lock failed"))?;
+        let mut scores: Vec<(String, f64)> = schemas.iter()
+            .filter(|s| s.level == level)
+            .filter(|s| parent_filter.map_or(true, |p| s.parent_id.as_deref() == Some(p)))
+            .map(|s| {
+                let similarity = cosine_similarity(embedding, &s.embedding) as f64;
+                (s.id.clone(), similarity)
             })
             .collect();
         
-        // Sort by score (highest first)
-        matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-        
-        // Extract just the PatternMatch objects
-        let mut pattern_matches: Vec<PatternMatch> = matches.into_iter().map(|(_, pm)| pm).collect();
-        
-        // Return primary match and alternatives
-        let primary = if pattern_matches.is_empty() {
-            None
-        } else {
-            Some(pattern_matches.remove(0))
-        };
-        
-        let alternatives = pattern_matches.into_iter().take(max_alternatives).collect();
-        
-        Ok((primary, alternatives))
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(scores)
     }
     
-    /// Health check for in-memory vector store
+    async fn find_patterns_in_subspace(&self, embedding: &[f32], prefix: &str, threshold: f64, limit: usize) -> Result<Vec<(String, f64, VectorPoint)>> {
+        let patterns = self.patterns.read().map_err(|_| anyhow!("Lock failed"))?;
+        let replaced_prefix = prefix.replace("/", "_");
+        
+        info!(target: "classifier", "Searching for patterns with prefix: '{}', threshold: {}", prefix, threshold);
+
+        let mut results: Vec<(String, f64, VectorPoint)> = patterns.iter()
+            .filter(|(id, _)| id.starts_with(&replaced_prefix))
+            .filter_map(|(_, point)| {
+                let similarity = cosine_similarity(embedding, &point.vector) as f64;
+                
+                let pattern_id = point.payload.get("pattern_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                debug!(target: "classifier", "Pattern: {}, Similarity: {:.4}", pattern_id, similarity);
+
+                if similarity >= threshold {
+                    Some((pattern_id.to_string(), similarity, point.clone()))
+                } else { 
+                    None 
+                }
+            })
+            .collect();
+            
+        info!(target: "classifier", "Found {} patterns matching prefix '{}' above threshold", results.len(), prefix);
+
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(limit);
+        Ok(results)
+    }
+
     pub async fn health_check(&self) -> Result<()> {
-        let count = self.vector_store.count()?;
-        info!("📊 In-memory vector store healthy - {} patterns loaded", count);
+        let count = self.patterns.read().map_err(|_| anyhow!("Lock failed"))?.len();
+        info!("📊 Classifier healthy - {} patterns loaded", count);
         Ok(())
-    }
-    
-    /// Get database statistics
-    pub async fn get_stats(&self) -> Result<Value> {
-        let stats = self.vector_store.stats()?;
-        let count = self.vector_store.count()?;
-        
-        let mut extended_stats = stats;
-        extended_stats.insert("total_points".to_string(), Value::Number(count.into()));
-        extended_stats.insert("classifier_type".to_string(), Value::String("in_memory".to_string()));
-        
-        Ok(serde_json::to_value(extended_stats)?)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[tokio::test]
-    async fn test_classification_request() {
-        let request = ClassificationRequest::new("test text".to_string());
-        assert_eq!(request.text, "test text");
-        assert!(request.confidence_threshold.is_none());
-    }
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    if a.len() != b.len() { return 0.0; }
+    let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot_product / (norm_a * norm_b) }
 } 

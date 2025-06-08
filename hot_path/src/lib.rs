@@ -5,14 +5,16 @@
 //! - Candle ML framework for native Rust embeddings
 //! - Axum web framework for blazing fast API
 
-pub mod generated;
 pub mod config;
 pub mod embeddings;
 pub mod classifier;
 pub mod service;
+pub mod stats;
 
-// Re-export main types for convenience
+pub mod generated {
+    include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+}
+
 pub use config::Config;
-pub use classifier::PatternClassifier;
-pub use generated::*;
+pub use classifier::HierarchicalClassifier;
 pub use service::ClassificationService; 

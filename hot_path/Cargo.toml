@@ -15,11 +15,12 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 # Simple in-memory vector store - no external dependencies!
 # qdrant-client = "1.9"  # Optional: can add back for production
 
-# ML/Embeddings (simplified for now - can add Candle later)
-# candle-core = "0.4"  # Has dependency conflicts currently
-# candle-nn = "0.4"
-# candle-transformers = "0.4"
-# tokenizers = "0.15"
+# ML/Embeddings with Candle (Latest Stable)
+candle-core = "0.9.1"
+candle-nn = "0.9.1" 
+candle-transformers = "0.9.1"
+tokenizers = "0.15"
+hf-hub = "0.3"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -44,6 +45,7 @@ config = "0.14"
 
 # Performance
 rayon = "1.8"
+moka = { version = "0.12", features = ["future"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
